@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P5.js Example</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdn.socket.io/4.4.1/socket.io.min.js"></script>
+</head>
+<body>
+    <script>      
+        let currentNode = 0
+        let opponentNode = 0
+
+        let boardMarginScale = 0.1
+        let boardTop = boardMarginScale * window.innerHeight;
+        let boardLeft = boardMarginScale * window.innerWidth;
+        let boardBottom = (1 - boardMarginScale) * window.innerHeight;
+        let boardRight = (1 - boardMarginScale) * window.innerWidth;
+
+        let boardWidth = boardRight - boardLeft;
+        let boardHeight = boardBottom - boardTop;
+
+        let graphMargin = boardMarginScale * window.innerHeight
+        let graphTop = boardTop + graphMargin;
+        let graphLeft = boardLeft + graphMargin;
+        let graphBottom = boardBottom - graphMargin;
+        let graphRight = boardRight - graphMargin;
+
+        let graphWidth = graphRight - graphLeft;
+        let graphHeight = graphBottom - graphTop;
+
+        let team;
+        let graphColors;
+
+        let edges;
+        let nodesX;
+        let nodesY;
+        
+        let nodes = [];
+        let nodeColor = [0, 0, 0];
+        let nodeHoverColor = [0, 255, 0]; // Color when hovered (green)
+        let nodeDiameter = 50;
+
+        const socket = io('http://localhost:8000', { path: '/socket.io/' });
+        // const socket = io('http://localhost:8000/socket.io');
+        
+        socket.on('connect', () => {
+            console.log('connected')
+            socket.emit('getRequest');
+        })
+
+        socket.on('disconnect', () => {
+            console.log('disconnected')
+        })
+        console.log('REACHED 1')
+
+        socket.on('gameData', data => {
+            team = data["color"]
+            console.log(team)
+            graphColors = data["graph-colors"]
+            edges = data["edges"];
+            // console.log(edges)
+            positions = Object.values(data["positions"])    
+            nodesX = positions.map(position => position[0]);
+            nodesY = positions.map(position => position[1]);
+            fitGraph();
+            for (let i = 0; i < graphColors.length; i++) {
+                if (graphColors[i] === "white") {
+                    nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: [255, 255, 255], hoverColor: nodeHoverColor, isClicked: false });
+                } else {
+                    nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: [0, 0, 0], hoverColor: nodeHoverColor, isClicked: false });
+                }
+
+            }
+            print(nodes)
+        })
+
+
+        function fitGraph() {
+            let minX = Math.min(...nodesX);
+            let maxX = Math.max(...nodesX);
+            let minY = Math.min(...nodesY);
+            let maxY = Math.max(...nodesY);
+            let width = maxX - minX;
+            let height = maxY - minY;
+            scaleX = graphWidth / width;
+            scaleY = graphHeight / height;
+            nodesX = nodesX.map(element => scaleX * (element - minX) + graphLeft);
+            nodesY = nodesY.map(element => scaleY * (element - minY) + graphTop);
+        }
+
+        // Your P5.js code goes here
+        function setup() {
+            createCanvas(window.innerWidth, window.innerHeight);
+        }
+
+        let count = 0;
+        function draw() {
+            
+            if (nodes.length == 0 || edges.length == 0) {
+                return
+            }
+            // resizeCanvas(window.innerWidth, viewHeight);
+            background(255, 255, 255); // RGB values for brown
+            // console.log(edges)
+            
+            fill(222, 184, 135);
+            rect(boardLeft, boardTop, (1 - 2 * boardMarginScale) * window.innerWidth, (1 - 2 * boardMarginScale) * window.innerHeight);
+
+            for (const edge of edges) {
+                ni = edge[0]
+                nj = edge[1]
+                line(nodes[ni].x, nodes[ni].y, nodes[nj].x, nodes[nj].y)
+            }
+
+            for (let i = 0; i < nodes.length; i++) {
+                let node = nodes[i]
+                let distance = dist(mouseX, mouseY, node.x, node.y);
+                let isHovered = distance < node.diameter / 2;
+                if (node.isClicked) {
+                    fill(node.hoverColor);
+                }
+                else if (mouseIsPressed && isHovered) {
+                    node.isClicked = true;
+                    fill(node.hoverColor);
+                    count++;
+
+                    socket.emit('click', {})
+                }
+                else if (isHovered) {
+                    fill(node.hoverColor); // Green if hovered
+                } 
+                else {
+                    fill(node.color); // Red otherwise
+                }
+                ellipse(node.x, node.y, node.diameter, node.diameter); // Draw the button
+            }    
+            
+        }
+
+        // sendData()
+
+        // function sendData() {
+        //     // const data = { newNode: currentNode };
+        //     const data = { num: 0 };
+        //     console.log('REACHED 0')
+        //     socket.emit('updateToServer', data);
+        //     console.log('REACHED 1')
+        // }
+
+        // socket.on('updateGame', (data) => {
+            
+        //     console.log(data)
+        //     redraw(); // Request to redraw the canvas
+        // });
+
+        // function windowResized() {
+        //     resizeCanvas(viewWidth, viewWidth);
+        //     fitGraph()
+        //     for (let i = 0; i < nodes.length; i++) {
+        //         nodes[i].x = nodesX[i];
+        //         nodes[i].y = nodesY[i];
+        //     }
+        // }
+
+
+
+
+        // function setupGame() {
+        //     return fetch('http://localhost:8000/play/', {
+        //             method: 'GET'
+        //         })
+        //         .then(response => {
+        //             response.json();
+        //         })
+        //         .then(data => {
+        //             // Access node positions
+        //             edges = data["edges"];
+        //             // console.log(edges)
+        //             positions = Object.values(data["positions"])
+        //             nodesX = positions.map(position => position[0]);
+        //             nodesY = positions.map(position => position[1]);
+        //             fitGraph();
+        //             for (let i = 0; i < edges.length; i++) {
+        //                 nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: nodeColor, hoverColor: nodeHoverColor, isClicked: false });
+        //             }
+        //         })
+        //         .catch(error => console.error('Error:', error));
+        // }
+    </script>
+</body>
+</html>
+
+
+
+
+
