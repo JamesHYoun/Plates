@@ -60,20 +60,21 @@ ready_event = asyncio.Event()  # Event to signal when two clients are connected
 
 @sio.on('connect')
 async def connect(sid, environ):
-    await sio.emit('connect', {'message': 'You are connected!'}, room=sid)
+    print('connected')
+    # await sio.emit('connect', {'message': 'You are connected!'}, room=sid)
 
 @sio.on('reconnect')
 async def reconnect(sid, data):
-    sid = data['socketId']  # Access the socketId from the data
+    sid_org = data['socketId']  # Access the socketId from the data
 
-    if sid in sid_to_room:
-        room_id = sid_to_room[sid]
+    if sid_org in sid_to_room:
+        room_id = sid_to_room[sid_org]
         graph_colors = room_to_colors[room_id]
         graph_edges = room_to_edges[room_id]
         graph_position = room_to_positions[room_id]
 
         data = {
-            "team": sid_to_team[sid],
+            "team": sid_to_team[sid_org],
             "colors": graph_colors,
             "edges": graph_edges,
             "positions": graph_position
@@ -86,16 +87,11 @@ async def reconnect(sid, data):
                 room_id = i
 
         if room_id == -1:   # There are no rooms available
-            await sio.emit('connect', {})
+            pass
 
         else:   # There are rooms
             if unmatched_sids:    # If there is an unmatched player
-                print('--------------')
-                print('SHOULD NOT ENTER')
-                print('--------------')
                 opp_sid = unmatched_sids.pop()
-                print(sid)
-                print(opp_sid)
 
                 sid_to_room[sid] = room_id
                 sid_to_room[opp_sid] = room_id
@@ -137,7 +133,6 @@ async def reconnect(sid, data):
                 }
                 await sio.emit('gameData', data, room=opp_sid)
             else:
-                print('ENTEREDDDDD')
                 unmatched_sids.add(sid)
 
 @sio.on('disconnect')

@@ -42,6 +42,7 @@
         let nodeHoverColor = [0, 255, 0]; // Color when hovered (green)
         let nodeDiameter = 50;
 
+        
         const socket = io('http://localhost:8000', { path: '/socket.io/' });
         // const socket = io('http://localhost:8000/socket.io');
         
@@ -58,11 +59,9 @@
         socket.on('disconnect', () => {
             console.log('disconnected')
         })
-        console.log('REACHED 1')
 
         socket.on('gameData', data => {
             team = data["color"]
-            console.log(team)
             graphColors = data["colors"]
             edges = data["edges"];
             // console.log(edges)
