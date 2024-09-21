@@ -46,8 +46,13 @@
         // const socket = io('http://localhost:8000/socket.io');
         
         socket.on('connect', () => {
-            console.log('connected')
-            socket.emit('getRequest');
+            const socketId = sessionStorage.getItem('socketId');
+            if (socketId) {
+                socket.emit('reconnect', { socketId: socketId });
+            } else {
+                socket.emit('reconnect', { socketId: socket.id });
+                sessionStorage.setItem('socketId', socket.id);
+            }
         })
 
         socket.on('disconnect', () => {
@@ -58,7 +63,7 @@
         socket.on('gameData', data => {
             team = data["color"]
             console.log(team)
-            graphColors = data["graph-colors"]
+            graphColors = data["colors"]
             edges = data["edges"];
             // console.log(edges)
             positions = Object.values(data["positions"])    
