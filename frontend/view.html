@@ -33,14 +33,20 @@
         let team;
         let graphColors;
 
-        let edges;
-        let nodesX;
-        let nodesY;
+        const WHITE = [255, 255, 255]
+        const BLACK = [0, 0, 0]
+
+        let edges = null;
+        let nodesX = null;
+        let nodesY = null;
         
         let nodes = [];
         let nodeColor = [0, 0, 0];
         let nodeHoverColor = [0, 255, 0]; // Color when hovered (green)
         let nodeDiameter = 50;
+
+        let whitePosition;
+        let blackPosition;
 
         
         const socket = io('http://localhost:8000', { path: '/socket.io/' });
@@ -65,21 +71,23 @@
             graphColors = data["colors"]
             edges = data["edges"];
             // console.log(edges)
-            positions = Object.values(data["positions"])    
+            positions = Object.values(data["positions"])
+            whitePosition = data["white-position"]
+            blackPosition = data["black-position"]    
+            console.log('WHITE', whitePosition)
             nodesX = positions.map(position => position[0]);
             nodesY = positions.map(position => position[1]);
             fitGraph();
             for (let i = 0; i < graphColors.length; i++) {
                 if (graphColors[i] === "white") {
-                    nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: [255, 255, 255], hoverColor: nodeHoverColor, isClicked: false });
+                    nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: WHITE, hoverColor: nodeHoverColor, isClicked: false });
                 } else {
-                    nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: [0, 0, 0], hoverColor: nodeHoverColor, isClicked: false });
+                    nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: BLACK, hoverColor: nodeHoverColor, isClicked: false });
                 }
 
             }
             print(nodes)
         })
-
 
         function fitGraph() {
             let minX = Math.min(...nodesX);
@@ -88,10 +96,25 @@
             let maxY = Math.max(...nodesY);
             let width = maxX - minX;
             let height = maxY - minY;
-            scaleX = graphWidth / width;
-            scaleY = graphHeight / height;
+            let scaleX = graphWidth / width;
+            let scaleY = graphHeight / height;
             nodesX = nodesX.map(element => scaleX * (element - minX) + graphLeft);
             nodesY = nodesY.map(element => scaleY * (element - minY) + graphTop);
+        }
+
+        function trianglePositions(centerX, centerY) {
+            const radius = nodeDiameter / 2;
+
+            const topX = centerX
+            const topY = centerY + nodeDiameter
+
+            const leftX = centerX - Math.sqrt(3) * radius
+            const leftY = centerY - radius
+
+            const rightX = centerX + Math.sqrt(3) * radius
+            const rightY = centerY - radius
+
+            return [topX, topY, leftX, leftY, rightX, rightY]
         }
 
         // Your P5.js code goes here
@@ -107,7 +130,6 @@
             }
             // resizeCanvas(window.innerWidth, viewHeight);
             background(255, 255, 255); // RGB values for brown
-            // console.log(edges)
             
             fill(222, 184, 135);
             rect(boardLeft, boardTop, (1 - 2 * boardMarginScale) * window.innerWidth, (1 - 2 * boardMarginScale) * window.innerHeight);
@@ -141,6 +163,30 @@
                 ellipse(node.x, node.y, node.diameter, node.diameter); // Draw the button
             }    
             
+            whiteCenterX = nodesX[whitePosition]
+            whiteCenterY = nodesY[whitePosition]
+            // console.log(nodesX)
+            // console.log(whitePosition)
+            // console.log(whiteCenterX)
+            const [wX1, wY1, wX2, wY2, wX3, wY3] = trianglePositions(whiteCenterX, whiteCenterY)
+            fill(WHITE)
+            triangle(wX1, wY1, wX2, wY2, wX3, wY3)
+
+            blackCenterX = nodesX[blackPosition]
+            blackCenterY = nodesY[blackPosition]
+            let [bX1, bY1, bX2, bY2, bX3, bY3] = trianglePositions(blackCenterX, blackCenterY)
+            fill(BLACK)
+            triangle(bX1, bY1, bX2, bY2, bX3, bY3)
+        }
+
+
+        function endGameHandler() {
+            const socketId = sessionStorage.getItem('socketId');
+            socket.emit('endGame', { socketId: socketId }); 
+            nodes = [];
+            nodesX = null;
+            nodesY = null;
+            edges = null
         }
 
         // sendData()
@@ -193,6 +239,7 @@
         //         .catch(error => console.error('Error:', error));
         // }
     </script>
+    <button onclick="endGameHandler()">End Game</button>
 </body>
 </html>
 

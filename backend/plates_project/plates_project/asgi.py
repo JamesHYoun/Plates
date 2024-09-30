@@ -10,13 +10,11 @@ from django.shortcuts import render
 from django.http import JsonResponse
 
 import random
-
-
-
 import socketio
 
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'plates_project.settings')
-# django.setup()
+django.setup()
 
 sio = socketio.AsyncServer(
     async_mode='asgi',
@@ -44,6 +42,7 @@ max_rooms = 10
 
 sid_to_room = {}
 sid_to_team = {}
+room_to_sid = {}
 
 unmatched_sids = set([])
 
@@ -51,12 +50,7 @@ room_to_edges = [[] for _ in range(max_rooms)]
 room_to_colors = [[] for _ in range(max_rooms)]
 room_to_positions = [{} for _ in range(max_rooms)]
 
-num_nodes = 4
-
-matched = False
-
-connected_clients = set()  # Set to track connected clients
-ready_event = asyncio.Event()  # Event to signal when two clients are connected
+num_nodes = 6
 
 @sio.on('connect')
 async def connect(sid, environ):
@@ -94,18 +88,29 @@ async def reconnect(sid, data):
                 opp_sid = unmatched_sids.pop()
 
                 sid_to_room[sid] = room_id
+                room_to_sid[room_id] = set([])
+                room_to_sid[room_id].add(sid)
                 sid_to_room[opp_sid] = room_id
 
                 # graph edges generation
-                graph_edges = [(0, 1), (1, 2), (2, 3), (3, 0), (0, 2)]
+                
+                graph_edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (0, 4), (1, 3), (0, 3)]
                 room_to_edges[room_id] = graph_edges
 
                 graph_colors = ['' for _ in range(num_nodes)]
-                for i in random.sample(range(0, num_nodes), num_nodes // 2):
-                    graph_colors[i] = 'white'    
-                for i,x in enumerate(graph_colors):
-                    if x == '':
-                        graph_colors[i] = 'black'
+                graph_colors[0] = 'white'
+                graph_colors[4] = 'white'
+                graph_colors[5] = 'white'
+                graph_colors[1] = 'black'
+                graph_colors[2] = 'black'
+                graph_colors[3] = 'black'
+
+                ### MAIN LOGIC ###
+                # for i in random.sample(range(0, num_nodes), num_nodes // 2):
+                #     graph_colors[i] = 'white'    
+                # for i,x in enumerate(graph_colors):
+                #     if x == '':
+                #         graph_colors[i] = 'black'
                 
                 room_to_colors[room_id] = graph_colors
 
@@ -115,34 +120,60 @@ async def reconnect(sid, data):
                 graph_position = {node: position[node].tolist() for node in position.keys()}
                 room_to_positions[room_id] = graph_position
 
-                sid_to_team[sid] = 'black'
-                data = {
-                    "team": 'black',
-                    "colors": graph_colors,
-                    "edges": graph_edges,
-                    "positions": graph_position
-                }
-                await sio.emit('gameData', data, room=sid)
+                ### MAIN LOGIC ###
+                # white_position = random.randint(0, num_nodes)
+                # black_position = random.randint(0, num_nodes)
+                # while white_position == black_position:
+                #     white_position = random.randint(0, num_nodes)
+                #     black_position = random.randint(0, num_nodes)
 
                 sid_to_team[opp_sid] = 'white'
+
                 data = {
                     "team": 'white',
                     "colors": graph_colors,
                     "edges": graph_edges,
-                    "positions": graph_position
+                    "positions": graph_position,
+                    "white-position": 0,
+                    "black-position": num_nodes - 1
                 }
+
+                sid_to_team[sid] = 'black'
+
+                data = {
+                    "team": 'black',
+                    "colors": graph_colors,
+                    "edges": graph_edges,
+                    "positions": graph_position,
+                    "white-position": 0,
+                    "black-position": num_nodes - 1
+                }
+                await sio.emit('gameData', data, room=sid)
+
+
                 await sio.emit('gameData', data, room=opp_sid)
             else:
                 unmatched_sids.add(sid)
 
 @sio.on('disconnect')
 async def disconnect(sid):
-    global graph_colors
-    connected_clients.remove(sid)  # Remove the client
-    if len(connected_clients) < 2:
-        graph_colors = ['' for _ in range(num_nodes)]
-        matched = False
-        ready_event.clear()  # Reset the event since we no longer have two clients
+    pass
+
+@sio.on('endGame')
+async def endGame(sid, data):
+    sid_org = data['socketId']  # Access the socketId from the data
+    room_id = sid_to_room[sid_org]
+    sids = room_to_sid[room_id]
+    sid1 = sids.pop()
+    sid2 = sids.pop()
+    del sid_to_room[sid1]
+    del sid_to_room[sid2]
+    del sid_to_team[sid1]
+    del sid_to_team[sid2]
+    del room_to_sid[room_id]
+    room_to_edges[room_id] = []
+    room_to_colors[room_id] = []
+    room_to_positions[room_id] = {}
 
 @sio.on('updateToServer')
 async def updateToServer(sid, data):
