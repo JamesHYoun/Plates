@@ -36,13 +36,15 @@
         const WHITE = [255, 255, 255]
         const BLACK = [0, 0, 0]
 
+        let graph = [];
         let edges = null;
         let nodesX = null;
         let nodesY = null;
         
+        let numNodes;
         let nodes = [];
         let nodeColor = [0, 0, 0];
-        let nodeHoverColor = [0, 255, 0]; // Color when hovered (green)
+        let nodeHoverColor = [128, 128, 128]; // Color when hovered (green)
         let nodeDiameter = 50;
 
         let whitePosition;
@@ -67,14 +69,15 @@
         })
 
         socket.on('gameData', data => {
-            team = data["color"]
+            console.log('ENTERERERERERD')
+            team = data["team"]
             graphColors = data["colors"]
             edges = data["edges"];
-            // console.log(edges)
+
             positions = Object.values(data["positions"])
-            whitePosition = data["white-position"]
-            blackPosition = data["black-position"]    
-            console.log('WHITE', whitePosition)
+            whiteIdx = data["white-position"]
+            blackIdx = data["black-position"]    
+        
             nodesX = positions.map(position => position[0]);
             nodesY = positions.map(position => position[1]);
             fitGraph();
@@ -86,7 +89,22 @@
                 }
 
             }
-            print(nodes)
+            
+            numNodes = nodes.length
+
+            graph = new Array(numNodes);
+
+            for (let i = 0; i < numNodes; i++) {
+                graph[i] = new Set([])
+            }
+
+            for (const edge of edges) {
+                nodeA = edge[0]
+                nodeB = edge[1]
+                graph[nodeA].add(nodeB)
+                graph[nodeB].add(nodeA)
+            }
+
         })
 
         function fitGraph() {
@@ -106,13 +124,13 @@
             const radius = nodeDiameter / 2;
 
             const topX = centerX
-            const topY = centerY + nodeDiameter
+            const topY = centerY - nodeDiameter
 
             const leftX = centerX - Math.sqrt(3) * radius
-            const leftY = centerY - radius
+            const leftY = centerY + radius
 
             const rightX = centerX + Math.sqrt(3) * radius
-            const rightY = centerY - radius
+            const rightY = centerY + radius
 
             return [topX, topY, leftX, leftY, rightX, rightY]
         }
@@ -142,6 +160,20 @@
 
             for (let i = 0; i < nodes.length; i++) {
                 let node = nodes[i]
+                fill(node.color); // Red otherwise
+                ellipse(node.x, node.y, node.diameter, node.diameter); // Draw the button
+            }    
+
+            let adjacents;
+
+            if (team === 'white') {
+                adjacents = graph[whiteIdx]
+            } else {
+                adjacents = graph[blackIdx]
+            }
+
+            for (let idx of adjacents) {
+                let node = nodes[idx]
                 let distance = dist(mouseX, mouseY, node.x, node.y);
                 let isHovered = distance < node.diameter / 2;
                 if (node.isClicked) {
@@ -163,20 +195,20 @@
                 ellipse(node.x, node.y, node.diameter, node.diameter); // Draw the button
             }    
             
-            whiteCenterX = nodesX[whitePosition]
-            whiteCenterY = nodesY[whitePosition]
-            // console.log(nodesX)
-            // console.log(whitePosition)
-            // console.log(whiteCenterX)
+            whiteCenterX = nodesX[whiteIdx]
+            whiteCenterY = nodesY[whiteIdx]
+
             const [wX1, wY1, wX2, wY2, wX3, wY3] = trianglePositions(whiteCenterX, whiteCenterY)
             fill(WHITE)
             triangle(wX1, wY1, wX2, wY2, wX3, wY3)
 
-            blackCenterX = nodesX[blackPosition]
-            blackCenterY = nodesY[blackPosition]
+            blackCenterX = nodesX[blackIdx]
+            blackCenterY = nodesY[blackIdx]
             let [bX1, bY1, bX2, bY2, bX3, bY3] = trianglePositions(blackCenterX, blackCenterY)
             fill(BLACK)
             triangle(bX1, bY1, bX2, bY2, bX3, bY3)
+
+
         }
 
 

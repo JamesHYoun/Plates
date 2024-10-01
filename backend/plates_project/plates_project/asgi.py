@@ -67,12 +67,17 @@ async def reconnect(sid, data):
         graph_edges = room_to_edges[room_id]
         graph_position = room_to_positions[room_id]
 
+        team = sid_to_team[sid_org]
+
         data = {
-            "team": sid_to_team[sid_org],
+            "team": team,
             "colors": graph_colors,
             "edges": graph_edges,
-            "positions": graph_position
+            "positions": graph_position,
+            "white-position": 0,
+            "black-position": 1
         }
+
         await sio.emit('gameData', data, room=sid)        
     else:
         room_id = -1
@@ -82,7 +87,6 @@ async def reconnect(sid, data):
 
         if room_id == -1:   # There are no rooms available
             pass
-
         else:   # There are rooms
             if unmatched_sids:    # If there is an unmatched player
                 opp_sid = unmatched_sids.pop()
@@ -104,6 +108,10 @@ async def reconnect(sid, data):
                 graph_colors[1] = 'black'
                 graph_colors[2] = 'black'
                 graph_colors[3] = 'black'
+
+                ### NOTES ###
+                # Make this a turn-based game
+                # Make sure every node has at least two edges. One edge can lead to one player blocking the other.
 
                 ### MAIN LOGIC ###
                 # for i in random.sample(range(0, num_nodes), num_nodes // 2):
@@ -127,7 +135,7 @@ async def reconnect(sid, data):
                 #     white_position = random.randint(0, num_nodes)
                 #     black_position = random.randint(0, num_nodes)
 
-                sid_to_team[opp_sid] = 'white'
+                sid_to_team[sid] = 'white'
 
                 data = {
                     "team": 'white',
@@ -135,10 +143,12 @@ async def reconnect(sid, data):
                     "edges": graph_edges,
                     "positions": graph_position,
                     "white-position": 0,
-                    "black-position": num_nodes - 1
+                    "black-position": 1
                 }
 
-                sid_to_team[sid] = 'black'
+                await sio.emit('gameData', data, room=sid)
+
+                sid_to_team[opp_sid] = 'black'
 
                 data = {
                     "team": 'black',
@@ -146,10 +156,8 @@ async def reconnect(sid, data):
                     "edges": graph_edges,
                     "positions": graph_position,
                     "white-position": 0,
-                    "black-position": num_nodes - 1
+                    "black-position": 1
                 }
-                await sio.emit('gameData', data, room=sid)
-
 
                 await sio.emit('gameData', data, room=opp_sid)
             else:
