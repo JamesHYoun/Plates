@@ -47,6 +47,8 @@
         let nodeHoverColor = [128, 128, 128]; // Color when hovered (green)
         let nodeDiameter = 50;
 
+        let preNode = null;
+
         let whitePosition;
         let blackPosition;
 
@@ -69,8 +71,8 @@
         })
 
         socket.on('gameData', data => {
-            console.log('ENTERERERERERD')
             team = data["team"]
+            console.log('TEAM', team)
             graphColors = data["colors"]
             edges = data["edges"];
 
@@ -88,6 +90,12 @@
                     nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: BLACK, hoverColor: nodeHoverColor, isClicked: false });
                 }
 
+            }
+
+            if (team === 'white') {
+                preNode = nodes[whiteIdx]
+            } else {
+                preNode = nodes[blackIdx]
             }
             
             numNodes = nodes.length
@@ -140,7 +148,6 @@
             createCanvas(window.innerWidth, window.innerHeight);
         }
 
-        let count = 0;
         function draw() {
             
             if (nodes.length == 0 || edges.length == 0) {
@@ -176,15 +183,18 @@
                 let node = nodes[idx]
                 let distance = dist(mouseX, mouseY, node.x, node.y);
                 let isHovered = distance < node.diameter / 2;
-                if (node.isClicked) {
-                    fill(node.hoverColor);
-                }
-                else if (mouseIsPressed && isHovered) {
+                if (mouseIsPressed && isHovered) {
                     node.isClicked = true;
-                    fill(node.hoverColor);
-                    count++;
-
-                    socket.emit('click', {})
+                    preNode.isClicked = false
+                    preNode = node
+                    if (team === 'white') {
+                        node.color = WHITE
+                        whiteIdx = idx
+                    } else {
+                        node.color = BLACK
+                        blackIdx = idx
+                    }
+                    fill(node.color)
                 }
                 else if (isHovered) {
                     fill(node.hoverColor); // Green if hovered
@@ -213,12 +223,14 @@
 
 
         function endGameHandler() {
+            console.log('ENTERED 1')
             const socketId = sessionStorage.getItem('socketId');
             socket.emit('endGame', { socketId: socketId }); 
             nodes = [];
             nodesX = null;
             nodesY = null;
             edges = null
+            background(255)
         }
 
         // sendData()

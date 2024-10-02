@@ -98,7 +98,7 @@ async def reconnect(sid, data):
 
                 # graph edges generation
                 
-                graph_edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (0, 4), (1, 3), (0, 3)]
+                graph_edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (0, 4), (1, 3), (0, 3), (3, 5)]
                 room_to_edges[room_id] = graph_edges
 
                 graph_colors = ['' for _ in range(num_nodes)]
@@ -166,6 +166,18 @@ async def reconnect(sid, data):
 @sio.on('disconnect')
 async def disconnect(sid):
     pass
+
+'''
+sid_to_room = {}
+sid_to_team = {}
+room_to_sid = {}
+
+unmatched_sids = set([])
+
+room_to_edges = [[] for _ in range(max_rooms)]
+room_to_colors = [[] for _ in range(max_rooms)]
+room_to_positions = [{} for _ in range(max_rooms)]
+'''
 
 @sio.on('endGame')
 async def endGame(sid, data):
