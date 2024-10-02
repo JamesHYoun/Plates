@@ -38,6 +38,8 @@ application = sio_app
 
 # Define Socket.IO events
 
+org_to_new = {}
+
 max_rooms = 10
 
 sid_to_room = {}
@@ -62,6 +64,7 @@ async def reconnect(sid, data):
     sid_org = data['socketId']  # Access the socketId from the data
 
     if sid_org in sid_to_room:
+        org_to_new[sid_org] = sid
         room_id = sid_to_room[sid_org]
         graph_colors = room_to_colors[room_id]
         graph_edges = room_to_edges[room_id]
@@ -74,28 +77,31 @@ async def reconnect(sid, data):
             "colors": graph_colors,
             "edges": graph_edges,
             "positions": graph_position,
-            "white-position": 0,
-            "black-position": 1
+            "white-idx": 0,
+            "black-idx": 1
         }
 
         await sio.emit('gameData', data, room=sid)        
     else:
+        # Check whether there's a free room
         room_id = -1
-        for i in range(max_rooms):
-            if not room_to_colors[i]:
-                room_id = i
+        for id in range(max_rooms):
+            if id not in room_to_sid:
+                room_id = id
 
         if room_id == -1:   # There are no rooms available
             pass
         else:   # There are rooms
             if unmatched_sids:    # If there is an unmatched player
-                opp_sid = unmatched_sids.pop()
 
-                sid_to_room[sid] = room_id
+                sid_to_room[sid_org] = room_id
                 room_to_sid[room_id] = set([])
-                room_to_sid[room_id].add(sid)
-                sid_to_room[opp_sid] = room_id
+                room_to_sid[room_id].add(sid_org)
 
+                opp_sid = unmatched_sids.pop()
+                
+                sid_to_room[opp_sid] = room_id
+                room_to_sid[room_id].add(opp_sid)
                 # graph edges generation
                 
                 graph_edges = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (0, 4), (1, 3), (0, 3), (3, 5)]
@@ -142,11 +148,11 @@ async def reconnect(sid, data):
                     "colors": graph_colors,
                     "edges": graph_edges,
                     "positions": graph_position,
-                    "white-position": 0,
-                    "black-position": 1
+                    "white-idx": 0,
+                    "black-idx": 1
                 }
 
-                await sio.emit('gameData', data, room=sid)
+                await sio.emit('gameData', data, room=sid_org)
 
                 sid_to_team[opp_sid] = 'black'
 
@@ -155,13 +161,13 @@ async def reconnect(sid, data):
                     "colors": graph_colors,
                     "edges": graph_edges,
                     "positions": graph_position,
-                    "white-position": 0,
-                    "black-position": 1
+                    "white-idx": 0,
+                    "black-idx": 1
                 }
 
                 await sio.emit('gameData', data, room=opp_sid)
             else:
-                unmatched_sids.add(sid)
+                unmatched_sids.add(sid_org)
 
 @sio.on('disconnect')
 async def disconnect(sid):
@@ -186,14 +192,26 @@ async def endGame(sid, data):
     sids = room_to_sid[room_id]
     sid1 = sids.pop()
     sid2 = sids.pop()
+    if sid1 == sid_org:
+        opp_sid = sid2
+    else:
+        opp_sid = sid1
     del sid_to_room[sid1]
     del sid_to_room[sid2]
     del sid_to_team[sid1]
     del sid_to_team[sid2]
     del room_to_sid[room_id]
-    room_to_edges[room_id] = []
-    room_to_colors[room_id] = []
-    room_to_positions[room_id] = {}
+    unmatched_sids = set([])
+    room_to_edges[room_id] = [[] for _ in range(max_rooms)]
+    room_to_colors[room_id] = [[] for _ in range(max_rooms)]
+    room_to_positions[room_id] = [{} for _ in range(max_rooms)]
+
+    opp_sid = org_to_new[opp_sid]
+
+    del org_to_new[sid1]
+    del org_to_new[sid2]
+
+    await sio.emit('endGame', room=opp_sid)
 
 @sio.on('updateToServer')
 async def updateToServer(sid, data):

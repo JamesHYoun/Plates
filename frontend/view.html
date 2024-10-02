@@ -9,8 +9,12 @@
 </head>
 <body>
     <script>      
-        let currentNode = 0
-        let opponentNode = 0
+
+        const WHITE = [255, 255, 255]
+        const BLACK = [0, 0, 0]
+        const NODEHOVERCOLOR = [128, 128, 128]; // Color when hovered (green)
+
+        let GAMESTART = true
 
         let boardMarginScale = 0.1
         let boardTop = boardMarginScale * window.innerHeight;
@@ -30,28 +34,51 @@
         let graphWidth = graphRight - graphLeft;
         let graphHeight = graphBottom - graphTop;
 
-        let team;
-        let graphColors;
+        let team = null;
 
-        const WHITE = [255, 255, 255]
-        const BLACK = [0, 0, 0]
+        let currentNode = 0
+        let opponentNode = 0
 
-        let graph = [];
+        let numNodes = null;
+        let nodeDiameter = 50;
+
+        let graph = null;
+        let nodes = [];
         let edges = null;
         let nodesX = null;
         let nodesY = null;
-        
-        let numNodes;
-        let nodes = [];
-        let nodeColor = [0, 0, 0];
-        let nodeHoverColor = [128, 128, 128]; // Color when hovered (green)
-        let nodeDiameter = 50;
 
+        let myIdx = null;
+        let opIdx = null;
+
+        let myColor = null
+        let opColor = null
+    
         let preNode = null;
 
-        let whitePosition;
-        let blackPosition;
 
+        function clearGame() {
+            let team = null;
+
+            let currentNode = 0
+            let opponentNode = 0
+
+            let numNodes = null;
+            let nodeDiameter = 50;
+
+            let graph = null;
+            let nodes = [];
+            let edges = null;
+            let nodesX = null;
+            let nodesY = null;
+
+            let whitePosition = null;
+            let blackPosition = null;
+
+            let preNode = null;
+
+            GAMESTART = false
+        }
         
         const socket = io('http://localhost:8000', { path: '/socket.io/' });
         // const socket = io('http://localhost:8000/socket.io');
@@ -71,32 +98,43 @@
         })
 
         socket.on('gameData', data => {
+            console.log(data)
             team = data["team"]
-            console.log('TEAM', team)
-            graphColors = data["colors"]
+            let graphColors = data["colors"]
             edges = data["edges"];
 
             positions = Object.values(data["positions"])
-            whiteIdx = data["white-position"]
-            blackIdx = data["black-position"]    
+
+            if (team === 'white') {
+                console.log('WHY ISNT IT')
+                myIdx = data["white-idx"]
+                console.log(data["white-idx"])
+                opIdx = data["black-idx"] 
+                myColor = WHITE
+                opColor = BLACK
+            } else {
+                console.log('WHY ISNT IT')
+                myIdx = data["black-idx"]
+                opIdx = data["white-idx"] 
+                myColor = BLACK
+                opColor = WHITE
+            }
+            console.log(myIdx)
+            console.log(opIdx)
         
             nodesX = positions.map(position => position[0]);
             nodesY = positions.map(position => position[1]);
             fitGraph();
             for (let i = 0; i < graphColors.length; i++) {
                 if (graphColors[i] === "white") {
-                    nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: WHITE, hoverColor: nodeHoverColor, isClicked: false });
+                    nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: WHITE, hoverColor: NODEHOVERCOLOR, isClicked: false });
                 } else {
-                    nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: BLACK, hoverColor: nodeHoverColor, isClicked: false });
+                    nodes.push({ x: nodesX[i], y: nodesY[i], diameter: nodeDiameter, color: BLACK, hoverColor: NODEHOVERCOLOR, isClicked: false });
                 }
 
             }
 
-            if (team === 'white') {
-                preNode = nodes[whiteIdx]
-            } else {
-                preNode = nodes[blackIdx]
-            }
+            preNode = nodes[myIdx]
             
             numNodes = nodes.length
 
@@ -113,6 +151,11 @@
                 graph[nodeB].add(nodeA)
             }
 
+        })
+
+        socket.on('endGame', data => {
+            console.log('REACHED ENDGAME')
+            clearGame()
         })
 
         function fitGraph() {
@@ -149,88 +192,74 @@
         }
 
         function draw() {
-            
-            if (nodes.length == 0 || edges.length == 0) {
-                return
-            }
-            // resizeCanvas(window.innerWidth, viewHeight);
-            background(255, 255, 255); // RGB values for brown
-            
-            fill(222, 184, 135);
-            rect(boardLeft, boardTop, (1 - 2 * boardMarginScale) * window.innerWidth, (1 - 2 * boardMarginScale) * window.innerHeight);
-
-            for (const edge of edges) {
-                ni = edge[0]
-                nj = edge[1]
-                line(nodes[ni].x, nodes[ni].y, nodes[nj].x, nodes[nj].y)
-            }
-
-            for (let i = 0; i < nodes.length; i++) {
-                let node = nodes[i]
-                fill(node.color); // Red otherwise
-                ellipse(node.x, node.y, node.diameter, node.diameter); // Draw the button
-            }    
-
-            let adjacents;
-
-            if (team === 'white') {
-                adjacents = graph[whiteIdx]
-            } else {
-                adjacents = graph[blackIdx]
-            }
-
-            for (let idx of adjacents) {
-                let node = nodes[idx]
-                let distance = dist(mouseX, mouseY, node.x, node.y);
-                let isHovered = distance < node.diameter / 2;
-                if (mouseIsPressed && isHovered) {
-                    node.isClicked = true;
-                    preNode.isClicked = false
-                    preNode = node
-                    if (team === 'white') {
-                        node.color = WHITE
-                        whiteIdx = idx
-                    } else {
-                        node.color = BLACK
-                        blackIdx = idx
-                    }
-                    fill(node.color)
+            if (GAMESTART) {
+                if (nodes.length == 0 || edges.length == 0) {
+                    return
                 }
-                else if (isHovered) {
-                    fill(node.hoverColor); // Green if hovered
-                } 
-                else {
+                // resizeCanvas(window.innerWidth, viewHeight);
+                background(255, 255, 255); // RGB values for brown
+
+                fill(222, 184, 135);
+                rect(boardLeft, boardTop, (1 - 2 * boardMarginScale) * window.innerWidth, (1 - 2 * boardMarginScale) * window.innerHeight);
+
+                for (const edge of edges) {
+                    ni = edge[0]
+                    nj = edge[1]
+                    line(nodes[ni].x, nodes[ni].y, nodes[nj].x, nodes[nj].y)
+                }
+
+                for (let i = 0; i < nodes.length; i++) {
+                    let node = nodes[i]
                     fill(node.color); // Red otherwise
+                    ellipse(node.x, node.y, node.diameter, node.diameter); // Draw the button
                 }
-                ellipse(node.x, node.y, node.diameter, node.diameter); // Draw the button
-            }    
-            
-            whiteCenterX = nodesX[whiteIdx]
-            whiteCenterY = nodesY[whiteIdx]
 
-            const [wX1, wY1, wX2, wY2, wX3, wY3] = trianglePositions(whiteCenterX, whiteCenterY)
-            fill(WHITE)
-            triangle(wX1, wY1, wX2, wY2, wX3, wY3)
+                let adjacents = graph[myIdx]
 
-            blackCenterX = nodesX[blackIdx]
-            blackCenterY = nodesY[blackIdx]
-            let [bX1, bY1, bX2, bY2, bX3, bY3] = trianglePositions(blackCenterX, blackCenterY)
-            fill(BLACK)
-            triangle(bX1, bY1, bX2, bY2, bX3, bY3)
+                for (let idx of adjacents) {
+                    if (idx === opIdx) {
+                        continue
+                    }
+                    let node = nodes[idx]
+                    let distance = dist(mouseX, mouseY, node.x, node.y);
+                    let isHovered = distance < node.diameter / 2;
+                    if (mouseIsPressed && isHovered) {
+                        node.isClicked = true;
+                        preNode.isClicked = false
+                        preNode = node
+                        node.color = myColor
+                        myIdx = idx
+                        fill(node.color)
+                    }
+                    else if (isHovered) {
+                        fill(node.hoverColor); // Green if hovered
+                    }
+                    else {
+                        fill(node.color); // Red otherwise
+                    }
+                    ellipse(node.x, node.y, node.diameter, node.diameter); // Draw the button
+                }
 
+                console.log('REACHED')
+
+                const [wX1, wY1, wX2, wY2, wX3, wY3] = trianglePositions(nodesX[myIdx], nodesY[myIdx])
+                fill(myColor)
+                triangle(wX1, wY1, wX2, wY2, wX3, wY3)
+
+                let [bX1, bY1, bX2, bY2, bX3, bY3] = trianglePositions(nodesX[opIdx], nodesY[opIdx])
+                fill(opColor)
+                triangle(bX1, bY1, bX2, bY2, bX3, bY3)
+            } else {
+                background(255)
+            }
 
         }
 
-
         function endGameHandler() {
-            console.log('ENTERED 1')
             const socketId = sessionStorage.getItem('socketId');
             socket.emit('endGame', { socketId: socketId }); 
-            nodes = [];
-            nodesX = null;
-            nodesY = null;
-            edges = null
-            background(255)
+
+            clearGame()
         }
 
         // sendData()
