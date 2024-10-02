@@ -10,11 +10,17 @@
 <body>
     <script>      
 
+        let socketId = null;
+
         const WHITE = [255, 255, 255]
         const BLACK = [0, 0, 0]
         const NODEHOVERCOLOR = [128, 128, 128]; // Color when hovered (green)
 
         let GAMESTART = true
+
+        let wait = false
+
+        let player = null
 
         let boardMarginScale = 0.1
         let boardTop = boardMarginScale * window.innerHeight;
@@ -84,12 +90,13 @@
         // const socket = io('http://localhost:8000/socket.io');
         
         socket.on('connect', () => {
-            const socketId = sessionStorage.getItem('socketId');
+            socketId = sessionStorage.getItem('socketId');
             if (socketId) {
                 socket.emit('reconnect', { socketId: socketId });
             } else {
                 socket.emit('reconnect', { socketId: socket.id });
                 sessionStorage.setItem('socketId', socket.id);
+                socketId = socket.id
             }
         })
 
@@ -98,29 +105,34 @@
         })
 
         socket.on('gameData', data => {
-            console.log(data)
             team = data["team"]
+            player = data["player"]
             let graphColors = data["colors"]
             edges = data["edges"];
 
             positions = Object.values(data["positions"])
 
             if (team === 'white') {
-                console.log('WHY ISNT IT')
                 myIdx = data["white-idx"]
-                console.log(data["white-idx"])
                 opIdx = data["black-idx"] 
                 myColor = WHITE
                 opColor = BLACK
+                if (player === 'white') {
+                    wait = false
+                } else {
+                    wait = true
+                }
             } else {
-                console.log('WHY ISNT IT')
                 myIdx = data["black-idx"]
                 opIdx = data["white-idx"] 
                 myColor = BLACK
                 opColor = WHITE
+                if (player === 'white') {
+                    wait = true
+                } else {
+                    wait = false
+                }
             }
-            console.log(myIdx)
-            console.log(opIdx)
         
             nodesX = positions.map(position => position[0]);
             nodesY = positions.map(position => position[1]);
@@ -153,8 +165,16 @@
 
         })
 
+        socket.on('continue', data => {
+            console.log('--------------')
+            console.log('on continue')
+            wait = false
+            opIdx = data["idx"]
+            node = nodes[opIdx]
+            node.color = opColor
+        })
+
         socket.on('endGame', data => {
-            console.log('REACHED ENDGAME')
             clearGame()
         })
 
@@ -215,7 +235,7 @@
                 }
 
                 let adjacents = graph[myIdx]
-
+                
                 for (let idx of adjacents) {
                     if (idx === opIdx) {
                         continue
@@ -223,24 +243,27 @@
                     let node = nodes[idx]
                     let distance = dist(mouseX, mouseY, node.x, node.y);
                     let isHovered = distance < node.diameter / 2;
-                    if (mouseIsPressed && isHovered) {
+                    if (mouseIsPressed && isHovered && !wait) {
                         node.isClicked = true;
                         preNode.isClicked = false
                         preNode = node
                         node.color = myColor
                         myIdx = idx
                         fill(node.color)
+                        ellipse(node.x, node.y, node.diameter, node.diameter);
+                        socket.emit('click', { socketId: socketId, idx: myIdx }); 
+                        wait = true
                     }
-                    else if (isHovered) {
-                        fill(node.hoverColor); // Green if hovered
+                    else if (isHovered && !wait) {
+                        fill(myColor)
+                        ellipse(node.x, node.y, 1.2 * node.diameter, 1.2 * node.diameter);
                     }
                     else {
                         fill(node.color); // Red otherwise
+                        ellipse(node.x, node.y, node.diameter, node.diameter);
                     }
-                    ellipse(node.x, node.y, node.diameter, node.diameter); // Draw the button
+                     // Draw the button
                 }
-
-                console.log('REACHED')
 
                 const [wX1, wY1, wX2, wY2, wX3, wY3] = trianglePositions(nodesX[myIdx], nodesY[myIdx])
                 fill(myColor)

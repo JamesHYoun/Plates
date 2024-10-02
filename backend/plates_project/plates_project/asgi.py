@@ -48,6 +48,8 @@ room_to_sid = {}
 
 unmatched_sids = set([])
 
+room_to_player = ['white' for _ in range(max_rooms)]
+room_to_teamIdx = [{} for _ in range(max_rooms)]
 room_to_edges = [[] for _ in range(max_rooms)]
 room_to_colors = [[] for _ in range(max_rooms)]
 room_to_positions = [{} for _ in range(max_rooms)]
@@ -66,19 +68,25 @@ async def reconnect(sid, data):
     if sid_org in sid_to_room:
         org_to_new[sid_org] = sid
         room_id = sid_to_room[sid_org]
+
+        graph_teamIdx = room_to_teamIdx[room_id]
+        white_idx = graph_teamIdx['white']
+        black_idx = graph_teamIdx['black']
         graph_colors = room_to_colors[room_id]
         graph_edges = room_to_edges[room_id]
         graph_position = room_to_positions[room_id]
 
         team = sid_to_team[sid_org]
+        player = room_to_player[room_id]
 
         data = {
             "team": team,
+            "player": player,
             "colors": graph_colors,
             "edges": graph_edges,
             "positions": graph_position,
-            "white-idx": 0,
-            "black-idx": 1
+            "white-idx": white_idx,
+            "black-idx": black_idx
         }
 
         await sio.emit('gameData', data, room=sid)        
@@ -134,6 +142,12 @@ async def reconnect(sid, data):
                 graph_position = {node: position[node].tolist() for node in position.keys()}
                 room_to_positions[room_id] = graph_position
 
+                white_idx = room_to_teamIdx[room_id]['white'] = 0
+                black_idx = room_to_teamIdx[room_id]['black'] = 1
+
+                player = room_to_player[room_id]
+
+
                 ### MAIN LOGIC ###
                 # white_position = random.randint(0, num_nodes)
                 # black_position = random.randint(0, num_nodes)
@@ -145,11 +159,12 @@ async def reconnect(sid, data):
 
                 data = {
                     "team": 'white',
+                    "player": player,
                     "colors": graph_colors,
                     "edges": graph_edges,
                     "positions": graph_position,
-                    "white-idx": 0,
-                    "black-idx": 1
+                    "white-idx": white_idx,
+                    "black-idx": black_idx
                 }
 
                 await sio.emit('gameData', data, room=sid_org)
@@ -158,11 +173,12 @@ async def reconnect(sid, data):
 
                 data = {
                     "team": 'black',
+                    "player": player,
                     "colors": graph_colors,
                     "edges": graph_edges,
                     "positions": graph_position,
-                    "white-idx": 0,
-                    "black-idx": 1
+                    "white-idx": white_idx,
+                    "black-idx": black_idx
                 }
 
                 await sio.emit('gameData', data, room=opp_sid)
@@ -172,6 +188,33 @@ async def reconnect(sid, data):
 @sio.on('disconnect')
 async def disconnect(sid):
     pass
+
+@sio.on('click')
+async def click(sid, data):
+    print('----------')
+    print('click')
+    sid_org = data['socketId']
+    room_id = sid_to_room[sid_org]
+    sids = room_to_sid[room_id]
+    sid_iter = iter(sids)
+    sid1 = next(sid_iter)
+    sid2 = next(sid_iter)
+    if sid1 == sid_org:
+        sid_opp = sid2
+    else:
+        sid_opp = sid1
+
+    room_to_player[room_id] = sid_to_team[sid_opp]
+
+    team = sid_to_team[sid_org]
+    idx = data['idx']
+    room_to_colors[room_id][idx] = team
+
+    data = {
+        "idx": idx
+    }
+
+    await sio.emit('continue', data, room=sid_opp)
 
 '''
 sid_to_room = {}
@@ -201,10 +244,11 @@ async def endGame(sid, data):
     del sid_to_team[sid1]
     del sid_to_team[sid2]
     del room_to_sid[room_id]
-    unmatched_sids = set([])
-    room_to_edges[room_id] = [[] for _ in range(max_rooms)]
-    room_to_colors[room_id] = [[] for _ in range(max_rooms)]
-    room_to_positions[room_id] = [{} for _ in range(max_rooms)]
+
+    room_to_teamIdx[room_id] = {}
+    room_to_edges[room_id] = []
+    room_to_colors[room_id] = []
+    room_to_positions[room_id] = {}
 
     opp_sid = org_to_new[opp_sid]
 
