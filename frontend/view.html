@@ -105,6 +105,7 @@
         })
 
         socket.on('gameData', data => {
+            console.log('ENTERED GAMEDATA')
             team = data["team"]
             player = data["player"]
             let graphColors = data["colors"]
