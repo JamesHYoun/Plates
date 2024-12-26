@@ -123,6 +123,8 @@
             if (team === 'white') {
                 myIdx = data["white-idx"]
                 opIdx = data["black-idx"] 
+                myScore = data["white-score"]
+                opScore = data["black-score"]
                 myColor = WHITE
                 opColor = BLACK
                 if (player === 'white') {
@@ -133,6 +135,8 @@
             } else {
                 myIdx = data["black-idx"]
                 opIdx = data["white-idx"] 
+                myScore = data["black-score"]
+                opScore = data["white-score"]
                 myColor = BLACK
                 opColor = WHITE
                 if (player === 'white') {
@@ -157,10 +161,6 @@
             preNode = nodes[myIdx]
             
             numNodes = nodes.length
-
-            console.log(numNodes)
-            myScore = numNodes / 2
-            opScore = numNodes / 2
 
             graph = new Array(numNodes);
 

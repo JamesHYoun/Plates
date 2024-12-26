@@ -49,8 +49,8 @@ room_to_sid = {}
 unmatched_sids = set([])
 
 room_to_player = ['white' for _ in range(max_rooms)]
-room_to_score_white = [0 for _ in range(max_rooms)]
-room_to_score_black = [0 for _ in range(max_rooms)]
+room_to_score_white = [3 for _ in range(max_rooms)]
+room_to_score_black = [3 for _ in range(max_rooms)]
 room_to_teamIdx = [{} for _ in range(max_rooms)]
 room_to_edges = [[] for _ in range(max_rooms)]
 room_to_colors = [[] for _ in range(max_rooms)]
@@ -81,6 +81,9 @@ async def reconnect(sid, data):
         team = sid_to_team[sid_org]
         player = room_to_player[room_id]
 
+        white_score = room_to_score_white[room_id]
+        black_score = room_to_score_black[room_id]
+
         data = {
             "team": team,
             "player": player,
@@ -88,7 +91,9 @@ async def reconnect(sid, data):
             "edges": graph_edges,
             "positions": graph_position,
             "white-idx": white_idx,
-            "black-idx": black_idx
+            "black-idx": black_idx,
+            "white-score": white_score,
+            "black-score": black_score
         }
 
         await sio.emit('gameData', data, room=sid)        
@@ -149,6 +154,9 @@ async def reconnect(sid, data):
                 white_idx = room_to_teamIdx[room_id]['white'] = 0
                 black_idx = room_to_teamIdx[room_id]['black'] = 1
 
+                white_score = room_to_score_white[room_id]
+                black_score = room_to_score_black[room_id]
+
                 player = room_to_player[room_id]
 
 
@@ -168,7 +176,9 @@ async def reconnect(sid, data):
                     "edges": graph_edges,
                     "positions": graph_position,
                     "white-idx": white_idx,
-                    "black-idx": black_idx
+                    "black-idx": black_idx,
+                    "white-score": white_score,
+                    "black-score": black_score
                 }
 
                 await sio.emit('gameData', data, room=sid_org)
@@ -182,7 +192,9 @@ async def reconnect(sid, data):
                     "edges": graph_edges,
                     "positions": graph_position,
                     "white-idx": white_idx,
-                    "black-idx": black_idx
+                    "black-idx": black_idx,
+                    "white-score": white_score,
+                    "black-score": black_score
                 }
 
                 room_to_score_white[room_id] = len(room_to_colors[room_id]) // 2
@@ -193,8 +205,19 @@ async def reconnect(sid, data):
                 unmatched_sids.add(sid_org)
 
 @sio.on('disconnect')
-async def disconnect(sid):
+async def disconnect(sid, data):
     pass
+    # print('disconnect')
+    # sid_org = data['socketId']  # Access the socketId from the data
+    # room_id = sid_to_room[sid_org]
+    # sids = room_to_sid[room_id]
+    # sid1 = sids.pop()
+    # sid2 = sids.pop()
+    # if sid1 == sid_org:
+    #     opp_sid = sid2
+    # else:
+    #     opp_sid = sid1
+    # await sio.emit('endGame', room=opp_sid)
 
 @sio.on('click')
 async def click(sid, data):
@@ -213,7 +236,7 @@ async def click(sid, data):
 
     team = sid_to_team[sid_org]
     idx = data['idx']
-    room_to_colors[room_id][idx] = team
+    
 
     graph_teamIdx = room_to_teamIdx[room_id]
 
@@ -223,13 +246,16 @@ async def click(sid, data):
         "idx": idx
     }
 
-    if team != room_to_colors[idx]:
+    if team != room_to_colors[room_id][idx]:
+        print('ENTERED')
         if team == 'white':
             room_to_score_white[room_id] += 1
             room_to_score_black[room_id] -= 1
         else:
             room_to_score_white[room_id] -= 1
             room_to_score_black[room_id] += 1
+
+    room_to_colors[room_id][idx] = team
 
     sid_opp = org_to_new[sid_opp]
 
