@@ -22,6 +22,8 @@
 
         let player = null
 
+        let graphColors = null
+
         let boardMarginScale = 0.1
         let boardTop = boardMarginScale * window.innerHeight;
         let boardLeft = boardMarginScale * window.innerWidth;
@@ -62,26 +64,32 @@
     
         let preNode = null;
 
+        let myScore = null;
+        let opScore = null;
+
 
         function clearGame() {
-            let team = null;
+            team = null;
 
-            let currentNode = 0
-            let opponentNode = 0
+            currentNode = 0
+            opponentNode = 0
 
-            let numNodes = null;
-            let nodeDiameter = 50;
+            numNodes = null;
+            nodeDiameter = 50;
 
-            let graph = null;
-            let nodes = [];
-            let edges = null;
-            let nodesX = null;
-            let nodesY = null;
+            graph = null;
+            nodes = [];
+            edges = null;
+            nodesX = null;
+            nodesY = null;
 
-            let whitePosition = null;
-            let blackPosition = null;
+            whitePosition = null;
+            blackPosition = null;
 
-            let preNode = null;
+            preNode = null;
+
+            myScore = null;
+            opScore = null;
 
             GAMESTART = false
         }
@@ -105,10 +113,9 @@
         })
 
         socket.on('gameData', data => {
-            console.log('ENTERED GAMEDATA')
             team = data["team"]
             player = data["player"]
-            let graphColors = data["colors"]
+            graphColors = data["colors"]
             edges = data["edges"];
 
             positions = Object.values(data["positions"])
@@ -151,6 +158,10 @@
             
             numNodes = nodes.length
 
+            console.log(numNodes)
+            myScore = numNodes / 2
+            opScore = numNodes / 2
+
             graph = new Array(numNodes);
 
             for (let i = 0; i < numNodes; i++) {
@@ -172,6 +183,12 @@
             wait = false
             opIdx = data["idx"]
             node = nodes[opIdx]
+
+            if (node.color !== opColor) {
+                myScore -= 1
+                opScore += 1
+            }
+
             node.color = opColor
         })
 
@@ -207,6 +224,10 @@
             return [topX, topY, leftX, leftY, rightX, rightY]
         }
 
+        function getScore() {
+
+        }
+
         // Your P5.js code goes here
         function setup() {
             createCanvas(window.innerWidth, window.innerHeight);
@@ -217,8 +238,8 @@
                 if (nodes.length == 0 || edges.length == 0) {
                     return
                 }
-                // resizeCanvas(window.innerWidth, viewHeight);
-                background(255, 255, 255); // RGB values for brown
+
+                background(255, 255, 255); 
 
                 fill(222, 184, 135);
                 rect(boardLeft, boardTop, (1 - 2 * boardMarginScale) * window.innerWidth, (1 - 2 * boardMarginScale) * window.innerHeight);
@@ -248,11 +269,20 @@
                         node.isClicked = true;
                         preNode.isClicked = false
                         preNode = node
-                        node.color = myColor
+
                         myIdx = idx
                         fill(node.color)
                         ellipse(node.x, node.y, node.diameter, node.diameter);
+    
                         socket.emit('click', { socketId: socketId, idx: myIdx }); 
+
+                        if (node.color !== myColor) {
+                            console.log('ENTERED')
+                            myScore += 1
+                            opScore -= 1
+                        }
+
+                        node.color = myColor
                         wait = true
                     }
                     else if (isHovered && !wait) {
@@ -260,10 +290,9 @@
                         ellipse(node.x, node.y, 1.2 * node.diameter, 1.2 * node.diameter);
                     }
                     else {
-                        fill(node.color); // Red otherwise
+                        fill(node.color);
                         ellipse(node.x, node.y, node.diameter, node.diameter);
                     }
-                     // Draw the button
                 }
 
                 const [wX1, wY1, wX2, wY2, wX3, wY3] = trianglePositions(nodesX[myIdx], nodesY[myIdx])
@@ -273,6 +302,16 @@
                 let [bX1, bY1, bX2, bY2, bX3, bY3] = trianglePositions(nodesX[opIdx], nodesY[opIdx])
                 fill(opColor)
                 triangle(bX1, bY1, bX2, bY2, bX3, bY3)
+
+                // Set text properties for scores
+                textSize(32); // Set a visible font size
+                textAlign(LEFT, TOP); // Align text to the top-left corner
+                fill(0); // Set text color to black
+
+                // Display scores
+                text(`My Score: ${myScore}`, 50, 100);
+                text(`Opponent's Score: ${opScore}`, 50, 150);
+
             } else {
                 background(255)
             }
