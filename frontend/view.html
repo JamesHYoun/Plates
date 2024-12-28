@@ -67,6 +67,12 @@
         let myScore = null;
         let opScore = null;
 
+        let myMovesLeft = null;
+        let opMovesLeft = null;
+
+        let myTimeLeft = 30
+        let opTimeLeft = null
+
 
         function clearGame() {
             team = null;
@@ -91,7 +97,10 @@
             myScore = null;
             opScore = null;
 
+            console.log('REACHED cleargame')
+
             GAMESTART = false
+            console.log(GAMESTART)
         }
         
         const socket = io('http://localhost:8000', { path: '/socket.io/' });
@@ -125,24 +134,36 @@
                 opIdx = data["black-idx"] 
                 myScore = data["white-score"]
                 opScore = data["black-score"]
+                myMovesLeft = data["white-moves-left"]
+                opMovesLeft = data["black-moves-left"]
+                // myTimeLeft = data["white-time-left"]
+                // opTimeLeft = data["black-time-left"]
                 myColor = WHITE
                 opColor = BLACK
                 if (player === 'white') {
                     wait = false
+                    // decrementMyTimer()
                 } else {
                     wait = true
+                    // decrementOpTimer()
                 }
             } else {
                 myIdx = data["black-idx"]
                 opIdx = data["white-idx"] 
                 myScore = data["black-score"]
                 opScore = data["white-score"]
+                myMovesLeft = data["black-moves-left"]
+                opMovesLeft = data["white-moves-left"]
+                // myTimeLeft = data["black-time-left"]
+                // opTimeLeft = data["white-time-left"]
                 myColor = BLACK
                 opColor = WHITE
                 if (player === 'white') {
                     wait = true
+                    // decrementOpTimer()
                 } else {
                     wait = false
+                    // decrementMyTimer()
                 }
             }
         
@@ -178,8 +199,7 @@
         })
 
         socket.on('continue', data => {
-            console.log('--------------')
-            console.log('on continue')
+            // decrementMyTimer()
             wait = false
             opIdx = data["idx"]
             node = nodes[opIdx]
@@ -189,10 +209,58 @@
                 opScore += 1
             }
 
+            opMovesLeft -= 1
+
             node.color = opColor
+
         })
 
+        async function decrementMyTimer() {
+            while (myTimeLeft > 0) {
+                if (!wait) {
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+                    console.log(myTimeLeft)
+                    myTimeLeft--; // Decrement the timer
+                    console.log('Time left:', myTimeLeft);
+                } else {
+            
+                    myTimeLeft = 30;
+                    // console.log('Timer reset to 30');
+                    await new Promise(resolve => setTimeout(resolve, 1000)); 
+                }       
+            }
+        }
+
+
+        decrementMyTimer()
+
+        // window.addEventListener('unload', (event) => {
+        //     console.log('before unload')
+        //     socket.emit('timeUpdate', { timeLeft: myTimeLeft }); 
+        // });
+
+        window.addEventListener('beforeunload', (event) => {
+            sessionStorage.setItem('timeLeft', myTimeLeft);
+        });
+
+        window.addEventListener('load', () => {
+            myTimeLeft = Number(sessionStorage.getItem('timeLeft')) || 30;
+            console.log(myTimeLeft)
+        });
+//         document.addEventListener('DOMContentLoaded', () => {
+//     myTimeLeft = Number(sessionStorage.getItem('timeLeft'));
+// });
+
+        // document.addEventListener('visibilitychange', () => {
+        //     if (document.visibilityState === 'hidden') {
+        //         console.log('before unload')
+        //         socket.emit('timeUpdate', { socketId: socketId, timeLeft: myTimeLeft }); 
+        //     }
+        // });
+
         socket.on('endGame', data => {
+            console.log('ENTERED END GAME')
+            GAMESTART = false
             clearGame()
         })
 
@@ -234,6 +302,7 @@
         }
 
         function draw() {
+            console.log(GAMESTART)
             if (GAMESTART) {
                 if (nodes.length == 0 || edges.length == 0) {
                     return
@@ -277,13 +346,20 @@
                         socket.emit('click', { socketId: socketId, idx: myIdx }); 
 
                         if (node.color !== myColor) {
-                            console.log('ENTERED')
                             myScore += 1
                             opScore -= 1
                         }
 
                         node.color = myColor
                         wait = true
+
+                        myMovesLeft -= 1
+
+                        if (opMovesLeft == 0) {
+                            GAMESTART = false
+                            background(255)
+                            endGameHandler()
+                        }
                     }
                     else if (isHovered && !wait) {
                         fill(myColor)
@@ -304,21 +380,32 @@
                 triangle(bX1, bY1, bX2, bY2, bX3, bY3)
 
                 // Set text properties for scores
-                textSize(32); // Set a visible font size
-                textAlign(LEFT, TOP); // Align text to the top-left corner
+                textSize(16); // Set a visible font size
+                // textAlign(LEFT, TOP); // Align text to the top-left corner
                 fill(0); // Set text color to black
 
                 // Display scores
                 text(`My Score: ${myScore}`, 50, 100);
                 text(`Opponent's Score: ${opScore}`, 50, 150);
 
+                text(`My Moves Left: ${myMovesLeft}`, 50, 250);
+                text(`Opponent's Moves Left: ${opMovesLeft}`, 50, 300);
+
+                if (!wait) {
+                    text(`My Time Left: ${myTimeLeft}`, 50, 400);
+                }
+                
+                // text(`Opponent's Time Left: ${opTimeLeft}`, 50, 450);
+
             } else {
+                console.log('ENTERED GAME END')
                 background(255)
             }
 
         }
 
         function endGameHandler() {
+            console.log('ENTERED endgamehandler')
             const socketId = sessionStorage.getItem('socketId');
             socket.emit('endGame', { socketId: socketId }); 
 
@@ -373,6 +460,55 @@
         //             }
         //         })
         //         .catch(error => console.error('Error:', error));
+        // }
+
+
+        // function decrementMyTimer() {
+        //     const intervalId = setInterval(() => {
+        //         if (myTimeLeft <= 0 || wait) {
+        //             clearInterval(intervalId);  // Stop the interval when time is up or wait is true
+        //             console.log("Timer finished!");
+        //         } else {
+        //             myTimeLeft--;  // Decrement the timer
+        //             console.log("Time left:", myTimeLeft);
+        //         }
+        //     }, 1000); // Decrement every 1 second
+        // }   
+        
+        // function decrementOpTimer() {
+        //     const intervalId = setInterval(() => {
+        //         if (opTimeLeft <= 0 || !wait) {
+        //             clearInterval(intervalId);  // Stop the interval when time is up or wait is true
+        //             console.log("Timer finished!");
+        //         } else {
+        //             opTimeLeft--;  // Decrement the timer
+        //             console.log("Time left:", opTimeLeft);
+        //         }
+        //     }, 1000); // Decrement every 1 second
+        // }   
+
+        // decrementMyTimer()
+
+        // async function decrementMyTimer() {
+        //     while (myTimeLeft >= 0) {
+        //         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        //         if (!wait) {
+        //             myTimeLeft--; // Decrement the timer
+        //         }
+                
+        //     }
+        // }
+
+        // decrementOpTimer()
+
+        // async function decrementOpTimer() {
+        //     while (opTimeLeft >= 0) {
+        //         await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+        //         if (wait) {
+        //             opTimeLeft--; // Decrement the timer
+        //         }
+                
+        //     }
         // }
     </script>
     <button onclick="endGameHandler()">End Game</button>

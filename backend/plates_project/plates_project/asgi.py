@@ -12,6 +12,9 @@ from django.http import JsonResponse
 import random
 import socketio
 
+import time
+
+
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'plates_project.settings')
 django.setup()
@@ -55,6 +58,8 @@ room_to_teamIdx = [{} for _ in range(max_rooms)]
 room_to_edges = [[] for _ in range(max_rooms)]
 room_to_colors = [[] for _ in range(max_rooms)]
 room_to_positions = [{} for _ in range(max_rooms)]
+room_to_moves_left = [{} for _ in range(max_rooms)]
+room_to_time_left = [{} for _ in range(max_rooms)]
 
 num_nodes = 6
 
@@ -84,6 +89,17 @@ async def reconnect(sid, data):
         white_score = room_to_score_white[room_id]
         black_score = room_to_score_black[room_id]
 
+        white_moves_left = room_to_moves_left[room_id]["white"]
+        black_moves_left = room_to_moves_left[room_id]["black"]
+
+        white_time_left = room_to_time_left[room_id]["white"]
+        black_time_left = room_to_time_left[room_id]["black"]
+
+        print('===================')
+        print(white_time_left)
+        print(black_time_left)
+        print('===================')
+
         data = {
             "team": team,
             "player": player,
@@ -93,7 +109,11 @@ async def reconnect(sid, data):
             "white-idx": white_idx,
             "black-idx": black_idx,
             "white-score": white_score,
-            "black-score": black_score
+            "black-score": black_score,
+            "white-moves-left": white_moves_left,
+            "black-moves-left": black_moves_left,
+            "white-time-left": white_time_left,
+            "black-time-left": black_time_left,
         }
 
         await sio.emit('gameData', data, room=sid)        
@@ -157,6 +177,18 @@ async def reconnect(sid, data):
                 white_score = room_to_score_white[room_id]
                 black_score = room_to_score_black[room_id]
 
+                room_to_moves_left[room_id]["white"] = 3
+                room_to_moves_left[room_id]["black"] = 3
+
+                white_moves_left = room_to_moves_left[room_id]["white"]
+                black_moves_left = room_to_moves_left[room_id]["black"]
+
+                room_to_time_left[room_id]["white"] = 30
+                room_to_time_left[room_id]["black"] = 30
+
+                white_time_left = room_to_time_left[room_id]["white"]
+                black_time_left = room_to_time_left[room_id]["black"]
+
                 player = room_to_player[room_id]
 
 
@@ -178,7 +210,11 @@ async def reconnect(sid, data):
                     "white-idx": white_idx,
                     "black-idx": black_idx,
                     "white-score": white_score,
-                    "black-score": black_score
+                    "black-score": black_score,
+                    "white-moves-left": white_moves_left,
+                    "black-moves-left": black_moves_left,
+                    "white-time-left": white_time_left,
+                    "black-time-left": black_time_left
                 }
 
                 await sio.emit('gameData', data, room=sid_org)
@@ -194,7 +230,11 @@ async def reconnect(sid, data):
                     "white-idx": white_idx,
                     "black-idx": black_idx,
                     "white-score": white_score,
-                    "black-score": black_score
+                    "black-score": black_score,
+                    "white-moves-left": white_moves_left,
+                    "black-moves-left": black_moves_left,
+                    "white-time-left": white_time_left,
+                    "black-time-left": black_time_left
                 }
 
                 room_to_score_white[room_id] = len(room_to_colors[room_id]) // 2
@@ -203,6 +243,25 @@ async def reconnect(sid, data):
                 await sio.emit('gameData', data, room=opp_sid)
             else:
                 unmatched_sids.add(sid_org)
+
+# async def countdown(room_id):
+#     while True:
+#         time.sleep(1)
+#         room_to_time_left[]
+
+@sio.on('timeUpdate')
+async def timeUpdate(sid, data):
+
+    sid_org = data['socketId']
+    room_id = sid_to_room[sid_org]
+    team = sid_to_team[sid_org]
+    room_to_time_left[room_id][team] = data['timeLeft']
+
+    print('---------------------------')
+    print('TIME UPDATE')
+    print(room_to_time_left[room_id][team])
+    print('---------------------------')
+
 
 @sio.on('disconnect')
 async def disconnect(sid, data):
@@ -255,6 +314,14 @@ async def click(sid, data):
             room_to_score_white[room_id] -= 1
             room_to_score_black[room_id] += 1
 
+    if team == 'white':
+        room_to_moves_left[room_id]['white'] -= 1
+    else:
+        room_to_moves_left[room_id]['black'] -= 1
+
+    if room_to_moves_left[room_id]['white'] == 0 and room_to_moves_left[room_id]['black'] == 0:
+        await sio.emit('endGame', data, room=sid_opp)
+
     room_to_colors[room_id][idx] = team
 
     sid_opp = org_to_new[sid_opp]
@@ -299,6 +366,12 @@ async def endGame(sid, data):
 
     del org_to_new[sid1]
     del org_to_new[sid2]
+
+    room_to_moves_left[room_id] = {}
+    room_to_time_left[room_id] = {}
+
+    print('------------------')
+    print('REACHED ENDGAME')
 
     await sio.emit('endGame', room=opp_sid)
 
